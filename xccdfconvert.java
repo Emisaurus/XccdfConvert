@@ -7,15 +7,19 @@ import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringReader;
 import java.lang.String;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.events.EndElement;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
@@ -28,6 +32,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+
 import java.util.regex.Matcher;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -62,43 +67,25 @@ public class xccdfconvert {
 		String message = "";
 		ArrayList<STIG> stig;
 
-		File xccdffile;
+		File xccdffile = new File(args[0]);
 		
 		try
 		{
-			File srrcopy = File.createTempFile("srrcopy", "");
-			Files.copy(xccdffile.toPath(), srrcopy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			//File srrcopy = File.createTempFile("srrcopy", "");
+			//Files.copy(xccdffile.toPath(), srrcopy.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
 			long timestart, timeend, duration;
 			
 			timestart = System.nanoTime();
-			stig = xmlStaxtoSTIG(srrcopy);
+			xmlStaxtoSTIG(xccdffile);
 			timeend = System.nanoTime();
 			duration = timeend - timestart;
-			
-			System.out.println("Adding stig items took: " + duration);
-			
-				timestart = System.nanoTime();
-				stigCompare(map, stig);
-				timeend = System.nanoTime();
-				duration = timeend - timestart;
-				System.out.println("Comparing stig items took: " + duration);
-				
-					timestart = System.nanoTime();
-					message = outChecklist(new File("./DBChecker/12c.ckl"), checklistfile, stig); 
-					timeend = System.nanoTime();
-					duration = timeend - timestart;
-					System.out.println("Creating checklist took: " + duration);
-			
-			srrcopy.delete();
-
+			System.out.println(duration);
 		}catch(Exception e) {
 			e.printStackTrace();
 			message = "An Error has occurred.  Please check the logs.";
 			error(e);
 		}
-		System.out.println(message);
-
 	}
 
 /*	public static void main(String[] args)
@@ -135,7 +122,7 @@ public class xccdfconvert {
 	}
 */	
 	
-	public static String convert(File xccdffile, File checklistfile)
+	public static void convert(File xccdffile, File checklistfile)
 	{
 		
 	}
@@ -186,7 +173,117 @@ public class xccdfconvert {
 	}
 	*/
 	
-	private static ArrayList<STIG> xmlStaxtoSTIG(File srrcopy) throws Exception {
+	private static void xmlStaxtoSTIG(File fvdlFile) throws Exception {
+		XMLInputFactory factory = XMLInputFactory.newInstance();
+		XMLStreamReader reader = factory.createXMLStreamReader(
+				new FileReader(fvdlFile));
+		String tagContent = null;
+		String title; //To grab the stigs/nist/owasp number
+		String author; //To grab the name it correlates to
+		String attribute = "None";
+		String display, end = "";
+		String[] buildData = new String[7]; //Set to the number of details needed
+		boolean boolCheck = false, srcFiles = false;
+		StringBuilder build = null;
+		STIG stig;
+		
+		try{
+		//If we pass in map will it save the data?
+		while(reader.hasNext()) {
+			int event = reader.next();
+			switch(event) {
+				case XMLStreamConstants.START_ELEMENT:
+					attribute = reader.getLocalName();
+					switch(reader.getLocalName()) {
+					case "Group":
+						stig = new STIG();
+						break;
+					case "Rule":
+						//stig.setSeverity(reader.getAttributeValue(0));
+						//stig.setWeight(reader.getAttributeValue(2));
+						while(reader.hasNext())
+						{
+							int subevent = abstrReader.next();
+							boolean read = true;
+							switch(subevent) {
+								case XMLStreamConstants.START_ELEMENT:
+									//System.out.println(subreader.getLocalName());
+									if(DocxDefaults.PARA.equals(abstrReader.getLocalName())) {
+										build = new StringBuilder();
+									}
+									if(DocxDefaults.ALTPARA.equals(abstrReader.getLocalName())) {
+										//System.out.println(build.toString());
+										rule.setDetailIssue(build.toString());
+									}
+									if(DocxDefaults.REPLACE.equals(abstrReader.getLocalName()))
+										read = false;
+									break;
+								case XMLStreamConstants.CHARACTERS:
+									if(read)
+										build.append(abstrReader.getText() + " ");
+									break;
+								case XMLStreamConstants.END_ELEMENT:
+									if(DocxDefaults.REPLACE.equals(abstrReader.getLocalName()))
+										read = true;
+									break;
+							}
+						}
+					};
+
+						
+					/*if(DocxDefaults.VULN.equals(reader.getLocalName())) {
+					//	issue = new Issue();
+					//} else {
+					if(DocxDefaults.DESC.equals(reader.getLocalName())) {
+						rule = new Rule(reader.getAttributeValue(1));
+					} else {
+					if(DocxDefaults.RULE.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+						rule = rules.get(attribute);
+					} else {
+					if(DocxDefaults.GROUP.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.LOC.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.DATE.equals(reader.getLocalName())) {
+							buildData[0] = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.SRCFILES.equals(reader.getLocalName())) {
+						srcFiles = true;
+					} else {
+					if(DocxDefaults.ABSTR.equals(reader.getLocalName())) {
+						boolCheck = true;
+						build = new StringBuilder();
+					} else {
+					if(DocxDefaults.RECOMM.equals(reader.getLocalName())) {
+						boolCheck = true;
+						build = new StringBuilder();
+					}}}}}}}}}
+									*/
+					break;
+
+				case XMLStreamConstants.CHARACTERS:
+					tagContent = reader.getText().trim();
+					break;
+					
+				case XMLStreamConstants.END_ELEMENT:
+					end = reader.getLocalName();
+					System.out.println("end: " + reader.getLocalName());
+					switch(reader.getLocalName()) {
+						case "title":
+							//stig.setTitle(tagContent);
+							break;
+					}
+					break;
+			}
+		}
+		} catch(Exception e) {
+			System.out.println("nope");
+		}
+		
+/*		
 		ArrayList<STIG> stigs = new ArrayList<>();
 		STIG tempstig = null;
 		ArrayList<String> details = null;
@@ -236,8 +333,288 @@ public class xccdfconvert {
 		}
 
 		return stigs;	
+		*/
 	}
 
+	/*
+	public static String[] fprFvdlRead(
+			File fvdlFile, Map<String, Integer> count, 
+			Map<String, ArrayList<Issue>> issues, Map<String, Rule> rules) throws Exception {
+		
+		XMLInputFactory factory = XMLInputFactory.newInstance();
+		XMLStreamReader reader = factory.createXMLStreamReader(
+				new FileReader(fvdlFile));
+		String tagContent = null;
+		String title; //To grab the stigs/nist/owasp number
+		String author; //To grab the name it correlates to
+		String attribute = "None";
+		String[] buildData = new String[7]; //Set to the number of details needed
+		Issue issue = null;
+		Rule rule = null;
+		ArrayList<Issue> issueList;
+		boolean boolCheck = false, srcFiles = false;
+		StringBuilder build = null;
+		
+		try{
+		//If we pass in map will it save the data?
+		while(reader.hasNext()) {
+			int event = reader.next();
+			switch(event) {
+				case XMLStreamConstants.START_ELEMENT:
+					attribute = reader.getLocalName();
+					//System.out.println(reader.getLocalName());
+					if(DocxDefaults.VULN.equals(reader.getLocalName())) {
+						issue = new Issue();
+					} else {
+					if(DocxDefaults.DESC.equals(reader.getLocalName())) {
+						rule = new Rule(reader.getAttributeValue(1));
+					} else {
+					if(DocxDefaults.RULE.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+						rule = rules.get(attribute);
+					} else {
+					if(DocxDefaults.GROUP.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.LOC.equals(reader.getLocalName())) {
+						attribute = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.DATE.equals(reader.getLocalName())) {
+							buildData[0] = reader.getAttributeValue(0);
+					} else {
+					if(DocxDefaults.SRCFILES.equals(reader.getLocalName())) {
+						srcFiles = true;
+					} else {
+					if(DocxDefaults.ABSTR.equals(reader.getLocalName())) {
+						boolCheck = true;
+						build = new StringBuilder();
+					} else {
+					if(DocxDefaults.RECOMM.equals(reader.getLocalName())) {
+						boolCheck = true;
+						build = new StringBuilder();
+					}}}}}}}}}
+					break;
+				
+				case XMLStreamConstants.CHARACTERS:
+					if(!boolCheck)
+					{
+						tagContent = reader.getText().trim();
+					} else
+					{
+						build.append(reader.getText().trim());
+					}
+					//System.out.println(reader.getText().trim());
+					break;
+					
+				case XMLStreamConstants.END_ELEMENT:
+					switch(reader.getLocalName()) {
+						case DocxDefaults.CLASSID:
+							issue.setClassId(tagContent);
+							if(count.containsKey(tagContent)) {
+								count.replace(tagContent, count.get(tagContent) + 1);
+							}else
+								count.put(tagContent, 1);
+							break;
+						case DocxDefaults.INSTID:
+							issue.setId(tagContent);
+							break;
+						case DocxDefaults.TYPE:
+							issue.setName(tagContent);
+							break;
+						case DocxDefaults.SUBTYPE:
+							issue.setSubName(tagContent);
+							break;
+						case DocxDefaults.CONFID:
+							issue.setConfidence(tagContent);
+							break;
+						case DocxDefaults.VULN:
+							//See if addressing the list will insert rather than doing map.replace
+							if(issues.containsKey(issue.getClassId())) {
+								issueList = issues.get(issue.getClassId());
+								issueList.add(issue);
+							} else {
+								issueList = new ArrayList<>();
+								issueList.add(issue);
+								issues.put(issue.getClassId(), issueList);
+							}
+							break;
+						case DocxDefaults.ABSTR:
+							//the abstract comes in <Content><Paragraph> and we need to strip that
+							//System.out.println(build.toString());
+							XMLStreamReader abstrReader = factory.createXMLStreamReader(
+									new StringReader(build.toString()));
+							while(abstrReader.hasNext())
+							{
+								int subevent = abstrReader.next();
+								boolean read = true;
+								switch(subevent) {
+									case XMLStreamConstants.START_ELEMENT:
+										//System.out.println(subreader.getLocalName());
+										if(DocxDefaults.PARA.equals(abstrReader.getLocalName())) {
+											build = new StringBuilder();
+										}
+										if(DocxDefaults.ALTPARA.equals(abstrReader.getLocalName())) {
+											//System.out.println(build.toString());
+											rule.setDetailIssue(build.toString());
+										}
+										if(DocxDefaults.REPLACE.equals(abstrReader.getLocalName()))
+											read = false;
+										break;
+									case XMLStreamConstants.CHARACTERS:
+										if(read)
+											build.append(abstrReader.getText() + " ");
+										break;
+									case XMLStreamConstants.END_ELEMENT:
+										if(DocxDefaults.REPLACE.equals(abstrReader.getLocalName()))
+											read = true;
+										break;
+								}
+							}
+							boolCheck = false;
+							break;
+						case DocxDefaults.RECOMM:
+							//the recomm comes in <Content> and we need to strip that
+							//System.out.println(build.toString());
+							XMLStreamReader recommReader = factory.createXMLStreamReader(
+									new StringReader(build.toString()));
+							boolean read = true;
+							build = new StringBuilder();
+							while(recommReader.hasNext())
+							{
+								int subevent = recommReader.next();
+								if(read) {
+									switch(subevent) {
+										case XMLStreamConstants.START_ELEMENT:
+											//System.out.println(subreader.getLocalName());
+											if(DocxDefaults.B.equals(recommReader.getLocalName()))
+											{
+												//System.out.println(tagContent);
+												rule.setDetailRecomm(build.toString());
+												read = false;
+											}
+											break;
+										case XMLStreamConstants.CHARACTERS:
+											build.append(recommReader.getText().trim());
+											break;
+										case XMLStreamConstants.END_ELEMENT:
+											if(DocxDefaults.CONT.equals(recommReader.getLocalName()))
+												rule.setDetailRecomm(build.toString());
+											break;
+									}
+								}
+							}
+							//System.out.println("Recommendation: " + build.toString());
+							//System.out.println();
+							//check if it grabs all of the recommendation
+							//System.out.println(rule.getId());
+							//System.out.println(build.toString());
+							//rule.setDetailRecomm(build.toString());
+							boolCheck = false;
+							break;
+						case DocxDefaults.GROUP:
+							switch(attribute)
+							{
+								case DocxDefaults.ACC:
+									rule.setAccuracy(tagContent);
+									break;
+								case DocxDefaults.IMPACT:
+									rule.setImpact(tagContent);
+									break;
+								case DocxDefaults.PROBAB:
+									if(rule != null)
+										rule.setProbability(tagContent);
+									break;
+								default:
+									Pattern p = Pattern.compile(DocxDefaults.REGEXSTIG);
+									Matcher m = p.matcher(attribute);
+									//ArrayList<String> stigList = new ArrayList<>();
+									if(m.find())
+									{
+										String stig = "";
+										if(!tagContent.equals("None")) {
+											//p = Pattern.compile(DocxDefaults.STIGREGEXREORDER);
+											for(String split : tagContent.split(","))
+											{
+												//m = p.matcher(split);
+												//m.find();
+												//int i = m.start();
+												//stig.concat((split.substring(i) 
+												//		+ split.substring(0, i)).trim()
+												//		+ "\n");
+												stig += split.substring(split.indexOf(DocxDefaults.REGEXREORDERSTIG)) + " " 
+														+ split.substring(0, split.indexOf(DocxDefaults.REGEXREORDERSTIG)) + "\n";
+												//System.out.println(stig);
+											}
+											rule.setStigid(stig.trim());
+										}
+									} else {
+										p = Pattern.compile(DocxDefaults.REGEXNIST);
+										m = p.matcher(attribute);
+										if(m.find()) {
+											rule.setNist(tagContent);
+										}  else {
+											p = Pattern.compile(DocxDefaults.REGEXOWASP);
+											m = p.matcher(attribute);
+											if(m.find()) {
+												rule.setOwasp(tagContent);
+											}  else {
+												p = Pattern.compile(DocxDefaults.REGEXCWE);
+												m = p.matcher(attribute);
+												if(m.find())
+													rule.setCwe(tagContent);
+											}
+										}
+									}
+									break;
+							}
+							break;
+						case DocxDefaults.BUILDID:
+							buildData[1] = tagContent;
+							break;
+						case DocxDefaults.NUMFILES:
+							buildData[2] = tagContent;
+							break;
+						case DocxDefaults.LOC:
+							if(!srcFiles)
+							{
+								switch(attribute) {
+									case DocxDefaults.EXELOC:
+										buildData[3] = tagContent;
+										break;
+									case DocxDefaults.TOTALLOC:
+										buildData[4] = tagContent;
+										break;	
+								}
+							}
+							break;
+						case DocxDefaults.DESC:
+							rules.put(rule.getId(), rule);
+							break;
+						case DocxDefaults.ENGVER:
+							buildData[5] = tagContent;
+							break;
+						case DocxDefaults.VER:
+							buildData[6] = tagContent;
+							break;
+					}
+					break;
+			}
+		}
+		} catch(Exception e) {
+			System.out.println("nope");
+		}
+		return buildData;
+		 /* [0] - ScanDate
+		  * [1] - BuildID
+		  * [2] - Number of Files
+		  * [3] - Lines of Code
+		  * [4] - Total Lines of Code
+		  * [5] - Scan Engine
+		  * [6] - RulePack
+		  *
+	}
+*/
+	
 	private static void stigCompare(SortedMap<String, ArrayList<String>> map, ArrayList<STIG> stig) {
 		for(int i = 0; i < stig.size(); i++)
 		{
@@ -350,4 +727,5 @@ public class xccdfconvert {
 			write.close();
 		}catch(Exception ex){}
 	}
+	
 }
