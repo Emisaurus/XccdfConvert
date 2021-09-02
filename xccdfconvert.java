@@ -235,8 +235,11 @@ public class xccdfconvert {
 		StringBuilder build = null;
 		STIG stig;
 		
+		//Separate this into portions to avoid the improper tag name re-use
 		try{
 		//If we pass in map will it save the data?
+		ArrayList<String> header = convertHeader(reader);
+			
 		while(reader.hasNext()) {
 			int event = reader.next();
 			switch(event) {
@@ -247,8 +250,37 @@ public class xccdfconvert {
 						stig = new STIG();
 						break;
 					case "Rule":
-						//stig.setSeverity(reader.getAttributeValue(0));
+						//stig.setSeverity(reader.getAttributeValue(1));
 						//stig.setWeight(reader.getAttributeValue(2));
+						while(reader.hasNext()) {
+							int subevent = reader.next();
+							switch(subevent) {
+								case XMLStreamConstants.START_ELEMENT:
+									break;
+									
+								case XMLStreamConstants.CHARACTERS:
+									tagContent = reader.getText().trim();
+									break;
+									
+								case XMLStreamConstants.END_ELEMENT:
+									switch(reader.getLocalName()) {
+										case "version":
+											//stig.setRuleVer(tagContent);
+											break;
+										case "title":
+											//stig.setRuleTitle(tagContent);
+											break;
+										case "description":
+											//stig.setRuleTitle(tagContent);
+											break;
+										case "ident":
+											//map.add(attribute, tagContent);
+											break;
+										case "fixtext":
+											//map.add(attribute, tagContent);
+											break;
+									}
+							}
 					};
 
 						
@@ -290,8 +322,6 @@ public class xccdfconvert {
 					break;
 					
 				case XMLStreamConstants.END_ELEMENT:
-					end = reader.getLocalName();
-					System.out.println("end: " + reader.getLocalName());
 					switch(reader.getLocalName()) {
 						case "title":
 							//stig.setTitle(tagContent);
@@ -357,6 +387,157 @@ public class xccdfconvert {
 		*/
 	}
 
+	private static ArrayList<String> convertHeader(XMLStreamReader reader) throws Exception {
+		String tagContent = null;
+		ArrayList<String> header = new ArrayList<>();
+		String attribute = "None";
+		String display, end = "";
+		String[] buildData = new String[7]; //Set to the number of details needed
+		boolean resume = true;
+		StringBuilder build = null;
+		
+		while(reader.hasNext() && resume) {
+			int event = reader.next();
+			switch(event) {
+				case XMLStreamConstants.START_ELEMENT:
+					switch(reader.getLocalName()) {
+					case "Profile":
+						resume = false;
+						break;
+					case "notice":
+						header.add(reader.getAttributeValue(0));
+						break;
+					};
+					break;
+
+				case XMLStreamConstants.CHARACTERS:
+					tagContent = reader.getText().trim();
+					if(!tagContent.isEmpty())
+						header.add(tagContent);
+					break;
+					
+				case XMLStreamConstants.END_ELEMENT:
+					break;
+			}
+		}
+		/*
+		 * 	<ASSET>
+		<ROLE>None</ROLE>
+		<ASSET_TYPE>Computing</ASSET_TYPE>
+		<HOST_NAME></HOST_NAME>
+		<HOST_IP></HOST_IP>
+		<HOST_MAC></HOST_MAC>
+		<HOST_FQDN></HOST_FQDN>
+		<TARGET_COMMENT></TARGET_COMMENT>
+		<TECH_AREA></TECH_AREA>
+		<TARGET_KEY>2899</TARGET_KEY>
+		<WEB_OR_DATABASE>false</WEB_OR_DATABASE>
+		<WEB_DB_SITE></WEB_DB_SITE>
+		<WEB_DB_INSTANCE></WEB_DB_INSTANCE>
+	</ASSET>
+	<STIGS>
+		<iSTIG>
+			<STIG_INFO>
+				<SI_DATA>
+					<SID_NAME>version</SID_NAME>
+					<SID_DATA>003.004</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>classification</SID_NAME>
+					<SID_DATA>UNCLASSIFIED</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>customname</SID_NAME>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>stigid</SID_NAME>
+					<SID_DATA>xccdf_mil.disa.stig_benchmark_RHEL_7_STIG</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>description</SID_NAME>
+					<SID_DATA>This Security Technical Implementation Guide is published as a tool to improve the security of Department of Defense (DoD) information systems. The requirements are derived from the National Institute of Standards and Technology (NIST) 800-53 and related documents. Comments or proposed revisions to this document should be sent via email to the following address: disa.stig_spt@mail.mil.</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>filename</SID_NAME>
+					<SID_DATA>U_RHEL_7_V3R4_STIG_SCAP_1-2_Benchmark.xml</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>releaseinfo</SID_NAME>
+					<SID_DATA>Release: 3.4 Benchmark Date: 23 Jul 2021</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>title</SID_NAME>
+					<SID_DATA>Red Hat Enterprise Linux 7 Security Technical Implementation Guide</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>uuid</SID_NAME>
+					<SID_DATA>70c9a7e0-4699-42ab-aa9a-a56477106670</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>notice</SID_NAME>
+					<SID_DATA>terms-of-use</SID_DATA>
+				</SI_DATA>
+				<SI_DATA>
+					<SID_NAME>source</SID_NAME>
+				</SI_DATA>
+			</STIG_INFO>
+		 * */
+		 return header;
+	}
+
+		
+/*		
+		ArrayList<STIG> stigs = new ArrayList<>();
+		STIG tempstig = null;
+		ArrayList<String> details = null;
+		XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
+		XMLEventReader xmlEventReader = xmlInputFactory.createXMLEventReader(new FileInputStream(srrcopy));
+		
+		while(xmlEventReader.hasNext())
+		{
+			XMLEvent xmlEvent = xmlEventReader.nextEvent();
+			if(xmlEvent.isStartElement())
+			{
+				StartElement startElement = xmlEvent.asStartElement();
+				//System.out.println(startElement.getName().getLocalPart());
+				
+				if(startElement.getName().getLocalPart().equals("VULN"))
+				{
+					tempstig = new STIG();
+					details = new ArrayList<>();
+				}
+				else if(startElement.getName().getLocalPart().equals("STIGID"))
+				{
+					xmlEvent = xmlEventReader.nextEvent();
+					//System.out.println(xmlEvent.asCharacters().getData());
+					tempstig.setStigid(xmlEvent.asCharacters().getData());
+				}
+				else if(startElement.getName().getLocalPart().equals("STATUS"))
+				{
+					xmlEvent = xmlEventReader.nextEvent();
+					tempstig.setStatus(xmlEvent.asCharacters().getData());
+				}else if(startElement.getName().getLocalPart().equals("FINDING_DETAILS"))
+				{
+					xmlEvent = xmlEventReader.nextEvent();
+					//Added if() due to <FINDING_DETAILS></FINDING_DETAILS> results on old scripts
+					if(!xmlEvent.isEndElement())
+						details.add(xmlEvent.asCharacters().getData());
+				}
+			}
+			if(xmlEvent.isEndElement())
+			{
+				EndElement endElement = xmlEvent.asEndElement();
+				if(endElement.getName().getLocalPart().equals("VULN"))
+				{ 
+					tempstig.setDetails(details);
+					stigs.add(tempstig);
+				}
+			}
+		}
+
+		return stigs;	
+		*/
+	
 	/*
 	public static String[] fprFvdlRead(
 			File fvdlFile, Map<String, Integer> count, 
