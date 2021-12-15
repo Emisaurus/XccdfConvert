@@ -41,6 +41,9 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
 public class xccdfconvert {
+	static File library = new File("./STIG LIBRARY");
+	static String xccdfname = ".*_.*_XCCDF-.*.xml";
+	
 	SortedMap<String, String> mapFiles = new TreeMap<String, String>();
 
 	public static void main(String[] args) {
@@ -55,15 +58,21 @@ public class xccdfconvert {
 				File top_directory = new File(args[1]);
 				if(top_directory.exists()  && top_directory.isDirectory()) {
 					//Create a FilenameFilter class for .xml files
-					filelist = fileSearch(top_directory.listFiles());
+					filelist = fileSearch(top_directory.listFiles(), Pattern.compile(xccdfname));
 					//filelist = fileSearch(top_directory.listFiles());
 					System.out.println(filelist.size());
+					timestart = System.nanoTime();
+					convert(filelist, null);
+					timeend = System.nanoTime();
+					duration = timeend - timestart;
+					System.out.println(duration);
 				}
 				break;
 			case "-o":
 				File xccdffile = new File(args[1]);
 				timestart = System.nanoTime();
-				convert(xccdffile, null);
+				File[] filelist = {xccdffile};
+				convert(filelist, null);
 				timeend = System.nanoTime();
 				duration = timeend - timestart;
 				System.out.println(duration);
@@ -84,7 +93,6 @@ public class xccdfconvert {
 	//This finds and loads each .xccdf from the STIGs to use as template
 	//Returns: Editted map of each STIG's file location and name
 	private static SortedMap<String, String> loadStigs() {
-		File library = new File("./STIG LIBRARY");
 		SortedMap<String, String> mapFiles = new TreeMap();
 		
 		try {
@@ -182,6 +190,7 @@ public class xccdfconvert {
 		
 		//settings
 		//regex for hostname and xccdf
+		//stiglibrary?
 		
 		try
 		{	
