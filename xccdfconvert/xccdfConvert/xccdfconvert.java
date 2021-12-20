@@ -19,21 +19,15 @@ import java.util.regex.Pattern;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
+
+import org.apache.commons.text.StringEscapeUtils;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
-
-import SCAPBench.RuleResultType;
-import SCAPBench.SCAPBench;
-import SCAPBench.TestResultType;
-import STIGBench.STIGBench;
-import checklist.ASSET;
-import checklist.CHECKLIST;
-import checklist.ISTIG;
-import checklist.SIDATA;
-import checklist.STIGDATA;
-import checklist.VULN;
+import SCAPBench.*;
+import checklist.*;
 import xccdfClasses.*;
 import STIGBench.*;
 
@@ -41,37 +35,31 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
 public class xccdfconvert {
-	static File library = new File("./STIG LIBRARY");
+	static File library = new File("STIG LIBRARY");
 	static String xccdfname = ".*_.*_XCCDF-.*.xml";
 	
 	SortedMap<String, String> mapFiles = new TreeMap<String, String>();
 
 	public static void main(String[] args) {
 		long timestart, timeend, duration;
-		SortedMap<String, String> mapFiles = loadStigs();
-		List<File> filelist;
+		ArrayList<File> filelist = new ArrayList<>();
 
 		switch(args[0])
 		{
 			case "-d":
-				//ArrayList<File> filelist = new ArrayList<>();
 				File top_directory = new File(args[1]);
 				if(top_directory.exists()  && top_directory.isDirectory()) {
-					//Create a FilenameFilter class for .xml files
-					filelist = fileSearch(top_directory.listFiles(), Pattern.compile(xccdfname));
-					//filelist = fileSearch(top_directory.listFiles());
-					System.out.println(filelist.size());
-					timestart = System.nanoTime();
+					fileSearch(filelist, top_directory.listFiles(), Pattern.compile(xccdfname));
+					//timestart = System.nanoTime();
 					convert(filelist, null);
-					timeend = System.nanoTime();
-					duration = timeend - timestart;
-					System.out.println(duration);
+					//timeend = System.nanoTime();
+					//duration = timeend - timestart;
+					//System.out.println(duration);
 				}
 				break;
 			case "-o":
 				File xccdffile = new File(args[1]);
 				timestart = System.nanoTime();
-				filelist = new ArrayList<File>();
 				filelist.add(xccdffile);
 				convert(filelist, null);
 				timeend = System.nanoTime();
@@ -97,75 +85,77 @@ public class xccdfconvert {
 		SortedMap<String, String> mapFiles = new TreeMap();
 		
 		try {
-				
-			List<File> files =  fileSearch(library.listFiles());
+			System.out.println(library.getAbsolutePath());
+			ArrayList<File> files = new ArrayList<>();
+			fileSearch(files, library.listFiles());
+			XMLInputFactory factory = XMLInputFactory.newInstance();
+			XMLStreamReader reader = null;
 			
 			for(File file : files)
 			{
-				XMLInputFactory factory = XMLInputFactory.newInstance();
-				XMLStreamReader reader = factory.createXMLStreamReader(
-						new FileReader(library));
-				String tagContent = null;
-				boolean boolCheck = false;
-			
-				//We only want to grab the title and add to our map of filenames	
-				while(reader.hasNext() && !boolCheck) {
-					int event = reader.next();
-					switch(event) {
-						case XMLStreamConstants.START_ELEMENT:
-							break;
-			
-						case XMLStreamConstants.CHARACTERS:
-							tagContent = reader.getText().trim();
-							break;
-							
-						case XMLStreamConstants.END_ELEMENT:
-							if(reader.getLocalName().equals("title"))
-							{
-								mapFiles.put(tagContent, file.getAbsolutePath());
-							}	
-							break;
+				try {
+					reader = factory.createXMLStreamReader(new FileReader(file));
+					String tagContent = null;
+					boolean boolCheck = false;
+				
+					//We only want to grab the title and add to our map of filenames	
+					while(reader.hasNext() && !boolCheck) {
+						int event = reader.next();
+						switch(event) {
+							case XMLStreamConstants.START_ELEMENT:
+								break;
+				
+							case XMLStreamConstants.CHARACTERS:
+								tagContent = reader.getText().trim();
+								break;
+								
+							case XMLStreamConstants.END_ELEMENT:
+								if(reader.getLocalName().equals("title"))
+								{
+									mapFiles.put(tagContent, file.getAbsolutePath());
+									boolCheck = true;
+								}	
+								break;
+						}
 					}
+					reader.close();
+				}catch(Exception e)
+				{
+					reader.close();
+					System.out.println("File failed to load: " + file.getAbsolutePath());
 				}
 			}
 		}catch(Exception e)
 		{
-			
+			error(e);
 		} finally
 		{
 		return mapFiles;
 		}
 	}
 	
-	private static List<File> fileSearch(File[] contents)
+	private static void fileSearch(ArrayList<File> files, File[] contents)
 	{ 
-		ArrayList<File> files = new ArrayList<>();
-		
-		
-		
 		for(File file : contents)
 		{
 			if(file.isDirectory())
 			{
-				fileSearch(file.listFiles());
+				fileSearch(files, file.listFiles());
 			}else
 			{
 				if(file.getName().endsWith(".xml"))
 					files.add(file);
 			}
 		}
-		return files;
 	}
 	
-	private static ArrayList<File> fileSearch(File[] contents, Pattern p)
+	private static void fileSearch(ArrayList<File> files, File[] contents, Pattern p)
 	{ 
-		ArrayList<File> files = new ArrayList<>();
-		
 		for(File file : contents)
 		{
 			if(file.isDirectory())
 			{
-				fileSearch(file.listFiles(), p);
+				fileSearch(files, file.listFiles(), p);
 			}else
 			{
 				Matcher m = p.matcher(file.getName());
@@ -173,7 +163,6 @@ public class xccdfconvert {
 					files.add(file);
 			}
 		}
-		return files;
 	}
 	
 	//Converts our results into a checklist
@@ -271,12 +260,10 @@ public class xccdfconvert {
 			    jaxbmarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE );
 			    jaxbmarshaller.marshal(entry.getValue(), checklistfile);
 		    }
-		     
-		    System.out.println("woooo?");
 		}
 		catch (JAXBException e) 
 		{
-		    e.printStackTrace();
+			error(e);
 		}
 	}
 	
@@ -318,7 +305,10 @@ public class xccdfconvert {
 			stigdata.add(new STIGDATA("Rule_Ver", rule.getVersion()));
 			stigdata.add(new STIGDATA("Rule_Title", rule.getTitle()));
 			
-			StringReader sr = new StringReader("<VulnData>" + rule.getDescription() + "</VulnData>");
+			//Need to split on VulnDiscussion so we can escape any XML characters
+			String[] vulndisc = rule.getDescription().split("</*VulnDiscussion>");
+			StringReader sr = new StringReader("<VulnData><VulnDiscussion>" +
+					StringEscapeUtils.escapeXml11(vulndisc[1]) + "</VulnDiscussion>" + vulndisc[2] + "</VulnData>");
 			jaxbContext = JAXBContext.newInstance(VulnData.class);
 			Unmarshaller unmarshallerVuln = jaxbContext.createUnmarshaller();
 			VulnData vulndata = (VulnData) unmarshallerVuln.unmarshal(sr);

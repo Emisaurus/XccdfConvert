@@ -23,6 +23,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import STIGBench.CheckType;
 import xccdfClasses.IdType;
+import xccdfClasses.IdentType;
 import xccdfClasses.SeverityEnumType;
 
 
